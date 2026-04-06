@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { connectDB } from "@/lib/db";
 import Vault from "@/models/Vault";
 
@@ -22,19 +21,12 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await connectDB();
-    const token = request.headers.get("authorization")?.split(" ")[1];
-    if (!token) return NextResponse.json({ error: "No token" }, { status: 401 });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const body = await request.json();
 
-    const vault = await Vault.create({
-      ...body,
-      programTeam: decoded.address,
-    });
-
+    const vault = await Vault.create(body);
     return NextResponse.json(vault, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to create vault" }, { status: 500 });
+    console.error("Vault POST Error:", error);
+    return NextResponse.json({ error: "Failed to create vault: " + error.message }, { status: 500 });
   }
 }

@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { isAddress } from "viem";
+import { isAddress, decodeEventLog } from "viem";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useVaultWrite } from "@/hooks/useVault";
 import { createVaultRecord } from "@/lib/api";
+import { BUG_BOUNTY_VAULT_ABI } from "@/lib/contractABI";
 import toast from "react-hot-toast";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -14,7 +15,8 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export default function CreateVaultForm() {
   const [step, setStep] = useState(1);
   const { address } = useAccount();
-  const { createVault, isPending, isConfirming, isSuccess, hash } = useVaultWrite();
+  const { createVault, isPending, isConfirming, isSuccess, receipt, hash } = useVaultWrite();
+  const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
     name: "", description: "", websiteUrl: "", governanceAuthority: "",
     rewardToken: ZERO_ADDRESS, critical: "", high: "", medium: "", low: "", fundAmount: "",
@@ -24,6 +26,7 @@ export default function CreateVaultForm() {
 
   const handleDeploy = async () => {
     try {
+      setSaved(false);
       createVault(
         form.governanceAuthority,
         form.rewardToken,
@@ -34,6 +37,65 @@ export default function CreateVaultForm() {
       toast.error(err.message);
     }
   };
+
+  // ── Save vault to MongoDB after on-chain tx confirms ──────────────────
+  useEffect(() => {
+    if (!isSuccess || !receipt || saved) return;
+
+    async function saveVaultToDB() {
+      try {
+        // Parse the VaultCreated event from the tx receipt logs to get the real on-chain vaultId
+        let onChainVaultId = null;
+        for (const log of receipt.logs) {
+          try {
+            const decoded = decodeEventLog({
+              abi: BUG_BOUNTY_VAULT_ABI,
+              data: log.data,
+              topics: log.topics,
+              eventName: "VaultCreated",
+            });
+            if (decoded?.args?.vaultId !== undefined) {
+              onChainVaultId = Number(decoded.args.vaultId);
+              break;
+            }
+          } catch {
+            // This log doesn't match VaultCreated — try next
+          }
+        }
+
+        if (onChainVaultId === null) {
+          toast.error("Vault deployed but could not read vault ID from chain.");
+          return;
+        }
+
+        await createVaultRecord({
+          onChainVaultId,
+          programTeam: address,
+          governanceAuthority: form.governanceAuthority,
+          rewardToken: form.rewardToken,
+          name: form.name,
+          description: form.description,
+          websiteUrl: form.websiteUrl,
+          rewards: {
+            critical: form.critical,
+            high: form.high,
+            medium: form.medium,
+            low: form.low,
+          },
+          totalFunded: form.fundAmount || "0",
+          active: true,
+        });
+
+        setSaved(true);
+        toast.success(`Vault #${onChainVaultId} saved to database!`);
+      } catch (err) {
+        console.error("DB save error:", err);
+        toast.error("Vault deployed on-chain, but DB save failed: " + err.message);
+      }
+    }
+
+    saveVaultToDB();
+  }, [isSuccess, receipt, saved]);
 
   const steps = [
     { num: 1, label: "Vault Info" },
@@ -115,11 +177,16 @@ export default function CreateVaultForm() {
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-              <Button onClick={handleDeploy} loading={isPending || isConfirming}>
-                {isPending ? "Confirm in Wallet..." : isConfirming ? "Deploying..." : isSuccess ? "✓ Vault Created!" : "Deploy Vault"}
+              <Button onClick={handleDeploy} loading={isPending || isConfirming} disabled={isSuccess && saved}>
+                {isPending ? "Confirm in Wallet..." : isConfirming ? "Deploying..." : (isSuccess && saved) ? "✓ Vault Created & Saved!" : isSuccess ? "Saving to DB..." : "Deploy Vault"}
               </Button>
             </div>
-            {isSuccess && <p className="text-green font-body text-sm">Transaction confirmed! Tx: {hash?.slice(0, 16)}...</p>}
+            {isSuccess && hash && (
+              <p className="text-green font-body text-sm">
+                Transaction confirmed! Tx: {hash?.slice(0, 16)}...
+                {saved && " • Saved to database ✓"}
+              </p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

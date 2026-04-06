@@ -1,10 +1,7 @@
 const API_BASE = "/api";
 
 async function request(url, options = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("db_token") : null;
   const headers = { "Content-Type": "application/json", ...options.headers };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
   const res = await fetch(`${API_BASE}${url}`, { ...options, headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Request failed");
@@ -29,34 +26,24 @@ export const createReportRecord = (body) => request("/reports", { method: "POST"
 export const updateReportStatus = (id, body) => request(`/reports/${id}/status`, { method: "PUT", body: JSON.stringify(body) });
 
 // ── Notifications ─────────────────────────────────────────────────────
-export const getNotifications = () => request("/notifications");
-export const markNotificationsRead = () => request("/notifications/mark-read", { method: "POST" });
+export const getNotifications = (address) => request(`/notifications${address ? `?address=${address}` : ""}`);
+export const markNotificationsRead = (address) => request(`/notifications/mark-read?address=${address}`, { method: "POST" });
 
 // ── Uploads ───────────────────────────────────────────────────────────
 export async function uploadImage(file) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("db_token") : null;
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${API_BASE}/upload/image`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
+  const res = await fetch(`${API_BASE}/upload/image`, { method: "POST", body: formData });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
   return data;
 }
 
 export async function uploadToIPFS(file, name) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("db_token") : null;
   const formData = new FormData();
   formData.append("file", file);
   formData.append("name", name || "bug-report");
-  const res = await fetch(`${API_BASE}/upload/ipfs`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
+  const res = await fetch(`${API_BASE}/upload/ipfs`, { method: "POST", body: formData });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "IPFS upload failed");
   return data;

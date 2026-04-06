@@ -20,6 +20,8 @@ export default function WalletProvider({ children }) {
           })}
         >
           {children}
+          {typeof window !== 'undefined' && console.log("VAULT_ADDRESS", process.env.NEXT_PUBLIC_VAULT_CONTRACT_ADDRESS)}
+          {typeof window !== 'undefined' && console.log("NFT_ADDRESS", process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS)}
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -9,13 +9,15 @@ import Badge from "@/components/ui/Badge";
 import { useReportWrite } from "@/hooks/useReport";
 import { getVaults, createReportRecord } from "@/lib/api";
 import { formatETH, SEVERITY_LABELS, SEVERITY_COLORS } from "@/lib/utils";
+import { BUG_BOUNTY_VAULT_ABI } from "@/lib/contractABI";
+import { decodeEventLog } from "viem";
 import toast from "react-hot-toast";
 
 export default function SubmitReportContent() {
   const searchParams = useSearchParams();
   const preVaultId = searchParams.get("vaultId");
   const { address } = useAccount();
-  const { submitReport, isPending, isConfirming, isSuccess, hash } = useReportWrite();
+  const { submitReport, isPending, isConfirming, isSuccess, receipt, hash } = useReportWrite();
 
   const [vaults, setVaults] = useState([]);
   const [form, setForm] = useState({
@@ -39,6 +41,14 @@ export default function SubmitReportContent() {
       toast.error("Fill all required fields");
       return;
     }
+    if (!form.description) {
+      toast.error("Description is required");
+      return;
+    }
+    if (form.ipfsHash === "QmPlaceholderHash" || !form.ipfsHash) {
+      toast.error("Please upload your evidence to IPFS and paste the real hash");
+      return;
+    }
     try {
       submitReport(form.vaultId, form.severity, form.ipfsHash);
     } catch (err) {
@@ -47,18 +57,55 @@ export default function SubmitReportContent() {
   };
 
   useEffect(() => {
-    if (isSuccess) {
-      toast.success("Report submitted on-chain!");
-      createReportRecord({
-        onChainReportId: Date.now(),
-        vaultId: Number(form.vaultId),
-        severity: SEVERITY_LABELS[form.severity],
-        title: form.title,
-        description: form.description,
-        ipfsHash: form.ipfsHash,
-      }).catch(() => {});
+    if (!isSuccess || !receipt) return;
+
+    async function saveReportToDB() {
+      try {
+        // Parse the ReportSubmitted event from the tx receipt to get the real on-chain reportId
+        let onChainReportId = null;
+        for (const log of receipt.logs) {
+          try {
+            const decoded = decodeEventLog({
+              abi: BUG_BOUNTY_VAULT_ABI,
+              data: log.data,
+              topics: log.topics,
+              eventName: "ReportSubmitted",
+            });
+            if (decoded?.args?.reportId !== undefined) {
+              onChainReportId = Number(decoded.args.reportId);
+              break;
+            }
+          } catch {
+            // This log doesn't match ReportSubmitted — try next
+          }
+        }
+
+        if (onChainReportId === null) {
+          toast.error("Report submitted on-chain, but could not read report ID from chain.");
+          return;
+        }
+
+        toast.success("Report submitted on-chain!");
+
+        await createReportRecord({
+          onChainReportId,
+          vaultId: Number(form.vaultId),
+          researcher: address,
+          severity: SEVERITY_LABELS[form.severity],
+          title: form.title,
+          description: form.description,
+          ipfsHash: form.ipfsHash,
+        });
+
+        toast.success(`Report #${onChainReportId} saved to database!`);
+      } catch (err) {
+        console.error("DB save error:", err);
+        toast.error("Report on-chain, but DB save failed: " + err.message);
+      }
     }
-  }, [isSuccess]);
+
+    saveReportToDB();
+  }, [isSuccess, receipt]);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -103,8 +150,8 @@ export default function SubmitReportContent() {
                   <span className="font-heading font-semibold text-sm">{sev}</span>
                 </div>
                 {selectedVault && (
-                  <p className="text-xs text-text-sec font-body">
-                    Reward: {formatETH(selectedVault.rewards?.[sev.toLowerCase()])} ETH
+                <p className="text-xs text-text-sec font-body">
+                    Reward: {parseFloat(selectedVault.rewards?.[sev.toLowerCase()] || 0).toFixed(4)} ETH
                   </p>
                 )}
               </motion.div>

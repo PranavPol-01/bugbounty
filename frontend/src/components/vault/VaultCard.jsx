@@ -5,9 +5,10 @@ import Badge from "@/components/ui/Badge";
 import { formatETH } from "@/lib/utils";
 
 export default function VaultCard({ vault }) {
-  const available = BigInt(vault.totalFunded || "0") - BigInt(vault.totalPaid || "0");
-  const total = BigInt(vault.totalFunded || "1");
-  const pct = total > 0n ? Number((available * 100n) / total) : 0;
+  const totalFunded = parseFloat(vault.totalFunded || "0");
+  const totalPaid = parseFloat(vault.totalPaid || "0");
+  const available = Math.max(totalFunded - totalPaid, 0);
+  const pct = totalFunded > 0 ? Math.round((available / totalFunded) * 100) : 0;
 
   return (
     <Link href={`/dashboard/vaults/${vault.onChainVaultId}`}>
@@ -50,7 +51,7 @@ export default function VaultCard({ vault }) {
           </div>
         </div>
         <div className="flex justify-between text-xs text-text-sec font-body">
-          <span>{formatETH(available.toString())} / {formatETH(vault.totalFunded)} ETH</span>
+          <span>{available.toFixed(4)} / {vault.totalFunded || "0"} ETH</span>
           <span className="text-orange font-medium">View →</span>
         </div>
       </motion.div>

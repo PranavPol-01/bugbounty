@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { connectDB } from "@/lib/db";
 import Report from "@/models/Report";
 import Notification from "@/models/Notification";
@@ -17,6 +16,7 @@ export async function GET(request) {
     const reports = await Report.find(filter).sort({ submittedAt: -1 }).limit(100);
     return NextResponse.json(reports);
   } catch (error) {
+    console.error("Report GET Error:", error);
     return NextResponse.json({ error: "Failed to fetch reports" }, { status: 500 });
   }
 }
@@ -24,27 +24,24 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await connectDB();
-    const token = request.headers.get("authorization")?.split(" ")[1];
-    if (!token) return NextResponse.json({ error: "No token" }, { status: 401 });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const body = await request.json();
 
-    const report = await Report.create({
-      ...body,
-      researcher: decoded.address,
-    });
+    const report = await Report.create(body);
 
-    await Notification.create({
-      recipientAddress: decoded.address,
-      type: "REPORT_SUBMITTED",
-      message: `Your report "${body.title}" has been submitted.`,
-      reportId: body.onChainReportId,
-      vaultId: body.vaultId,
-    });
+    // Create a notification for the researcher
+    if (body.researcher) {
+      await Notification.create({
+        recipientAddress: body.researcher.toLowerCase(),
+        type: "REPORT_SUBMITTED",
+        message: `Your report "${body.title}" has been submitted.`,
+        reportId: body.onChainReportId,
+        vaultId: body.vaultId,
+      }).catch((e) => console.warn("Notification create failed:", e.message));
+    }
 
     return NextResponse.json(report, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to create report" }, { status: 500 });
+    console.error("Report POST Error:", error);
+    return NextResponse.json({ error: "Failed to create report: " + error.message }, { status: 500 });
   }
 }

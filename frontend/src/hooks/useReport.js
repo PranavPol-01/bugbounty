@@ -4,7 +4,7 @@ import { BUG_BOUNTY_VAULT_ABI, VAULT_ADDRESS } from "@/lib/contractABI";
 
 export function useReportWrite() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
   const submitReport = (vaultId, severity, ipfsHash) => {
     writeContract({
@@ -42,5 +42,5 @@ export function useReportWrite() {
     });
   };
 
-  return { submitReport, approveReport, rejectReport, executePayout, hash, isPending, isConfirming, isSuccess, error };
+  return { submitReport, approveReport, rejectReport, executePayout, hash, isPending, isConfirming, isSuccess, receipt, error };
 }

@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/decentrabounty";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/decentrabounty";
 
 let cached = global.mongoose;
 if (!cached) {
@@ -13,7 +13,7 @@ export async function connectDB() {
   if (!cached.promise) {
     cached.promise = mongoose
       .connect(MONGODB_URI, { bufferCommands: false })
-      .then((m) => m)
+      .then((m) => { console.log("✅ Connected to MongoDB:", MONGODB_URI.replace(/\/\/.*@/, "//")); return m; })
       .catch((err) => {
         cached.promise = null; // reset if connection fails
         throw err;

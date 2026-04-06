@@ -1,7 +1,7 @@
 {
-  "bugBountyVault": "0xD81F79634dE62a8AEa5875e538F405B46BFA51df",
-  "reputationNFT": "0xB087c625CdC742ebd53eedCF47E0d67fe1dE7157",
+  "bugBountyVault": "0x787304a6a94241AF0cC761854E009AAa781dAF35",
+  "reputationNFT": "0x114909A9C2A43a87f7a830e385Bb3D802aE7F7b7",
   "network": "sepolia",
   "chainId": "11155111",
-  "deployedAt": "2026-04-05T16:33:16.496Z"
+  "deployedAt": "2026-04-06T17:43:37.048Z"
 }

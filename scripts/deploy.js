@@ -40,6 +40,30 @@ async function main() {
     JSON.stringify(addresses, null, 2)
   );
   console.log("Saved to deployed-addresses.json");
+
+  // 5. Update frontend .env with new addresses
+  const envPath = "./frontend/.env";
+  if (fs.existsSync(envPath)) {
+    let env = fs.readFileSync(envPath, "utf8");
+    env = env.replace(/^NEXT_PUBLIC_VAULT_CONTRACT_ADDRESS=.*/m, `NEXT_PUBLIC_VAULT_CONTRACT_ADDRESS=${vaultAddress}`);
+    env = env.replace(/^NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=.*/m, `NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=${nftAddress}`);
+    fs.writeFileSync(envPath, env);
+    console.log("Updated frontend/.env with contract addresses");
+  }
+
+  // 6. Copy compiled ABIs to frontend
+  const vaultArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/BugBountyVault.sol/BugBountyVault.json", "utf8"));
+  const nftArtifact = JSON.parse(fs.readFileSync("./artifacts/contracts/ReputationNFT.sol/ReputationNFT.json", "utf8"));
+  const abiContent = `// Auto-generated from Hardhat compilation artifacts — do not edit manually.
+export const BUG_BOUNTY_VAULT_ABI = ${JSON.stringify(vaultArtifact.abi, null, 2)};
+
+export const REPUTATION_NFT_ABI = ${JSON.stringify(nftArtifact.abi, null, 2)};
+
+export const VAULT_ADDRESS = "${vaultAddress}";
+export const NFT_ADDRESS = "${nftAddress}";
+`;
+  fs.writeFileSync("./frontend/src/lib/contractABI.js", abiContent);
+  console.log("Updated frontend ABI file and hardcoded contract addresses");
 }
 
 main().catch((err) => { console.error(err); process.exitCode = 1; });

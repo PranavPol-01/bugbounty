@@ -14,7 +14,7 @@ export function useVaultRead(functionName, args = []) {
 
 export function useVaultWrite() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
   const createVault = (governanceAuthority, rewardToken, critical, high, medium, low, ethValue) => {
     writeContract({
@@ -45,5 +45,6 @@ export function useVaultWrite() {
     });
   };
 
-  return { createVault, fundVault, toggleVault, hash, isPending, isConfirming, isSuccess, error };
+  return { createVault, fundVault, toggleVault, hash, isPending, isConfirming, isSuccess, receipt, error };
 }
+
